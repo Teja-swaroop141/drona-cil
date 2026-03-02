@@ -8,10 +8,18 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+const _supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
 });
+
+// ── MySQL toggle ────────────────────────────────────────────────────────────
+// Set VITE_USE_MYSQL=true in .env to route all DB calls to the local Express
+// backend instead of Supabase. The Supabase code above is completely untouched.
+import { mysqlClient } from '../mysql/client';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabase: any =
+  import.meta.env.VITE_USE_MYSQL === 'true' ? mysqlClient : _supabaseClient;

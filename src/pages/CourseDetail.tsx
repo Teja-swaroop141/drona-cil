@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Star, 
-  Clock, 
-  BookOpen, 
-  ArrowLeft, 
-  Users, 
+import {
+  Star,
+  Clock,
+  BookOpen,
+  ArrowLeft,
+  Users,
   Award,
   CheckCircle2,
   Lock,
@@ -173,7 +173,7 @@ const CourseDetail = () => {
     try {
       setEnrolling(true);
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         navigate("/auth");
         return;
@@ -192,7 +192,7 @@ const CourseDetail = () => {
 
       setIsEnrolled(true);
       toast.success("Successfully enrolled in the course!");
-      
+
       // Note: enrolled_count is automatically updated by database trigger on user_enrollments
     } catch (error: any) {
       console.error("Error enrolling:", error);
@@ -265,12 +265,12 @@ const CourseDetail = () => {
 
       // Check if all modules are now completed
       const completedModuleIds = safeProgressData.filter(p => p.completed).map(p => p.module_id);
-      const allModulesCompleted = courseModuleIds.length > 0 && 
+      const allModulesCompleted = courseModuleIds.length > 0 &&
         courseModuleIds.every(id => completedModuleIds.includes(id));
-      
+
       if (allModulesCompleted) {
         setIsCourseCompleted(true);
-        
+
         // Check if user has passed any quiz for final assessment
         const { data: passedQuizAttempts } = await supabase
           .from("quiz_attempts")
@@ -279,10 +279,10 @@ const CourseDetail = () => {
           .in("module_id", courseModuleIds)
           .eq("passed", true)
           .limit(1);
-        
+
         const quizPassed = (passedQuizAttempts?.length || 0) > 0;
         setHasPassedQuiz(quizPassed);
-        
+
         if (quizPassed) {
           toast.success("🎉 Congratulations! Course completed! Your certificate is now available.");
           // Scroll to certificate section after a short delay
@@ -523,8 +523,8 @@ const CourseDetail = () => {
 
       {/* Back Button */}
       <div className="container pt-4">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => navigate("/dashboard")}
           className="gap-2 text-muted-foreground hover:text-foreground"
         >
@@ -544,11 +544,11 @@ const CourseDetail = () => {
                 </Badge>
                 <Badge variant="outline">{course.category}</Badge>
               </div>
-              
+
               <h1 className="text-4xl lg:text-5xl font-bold">{course.title}</h1>
-              
+
               <p className="text-lg text-muted-foreground">{course.description}</p>
-              
+
               <div className="flex flex-wrap gap-6">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -587,7 +587,7 @@ const CourseDetail = () => {
                   <div className="text-center">
                     <p className="text-3xl font-bold">₹{course.price.toLocaleString()}</p>
                   </div>
-                  
+
                   {isEnrolled ? (
                     <div className="space-y-3">
                       <Button className="w-full" size="lg" disabled>
@@ -600,7 +600,7 @@ const CourseDetail = () => {
                           <span className="font-semibold">{courseProgress}%</span>
                         </div>
                         <div className="w-full bg-secondary rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-primary h-2 rounded-full transition-all"
                             style={{ width: `${courseProgress}%` }}
                           />
@@ -608,8 +608,8 @@ const CourseDetail = () => {
                       </div>
                     </div>
                   ) : (
-                    <Button 
-                      className="w-full bg-primary hover:bg-primary/90" 
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90"
                       size="lg"
                       onClick={handleEnroll}
                       disabled={enrolling}
@@ -619,7 +619,7 @@ const CourseDetail = () => {
                   )}
 
                   <Separator />
-                  
+
                   <div className="space-y-2 text-sm">
                     <p className="font-semibold">This course includes:</p>
                     <ul className="space-y-2 text-muted-foreground">
@@ -659,7 +659,7 @@ const CourseDetail = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-                {modules.map((module, index) => {
+              {modules.map((module, index) => {
                 const isUnlocked = isModuleUnlocked(index);
                 const canAccess = (isEnrolled && isUnlocked) || module.is_preview;
                 const isCompleted = isModuleCompleted(module.id);
@@ -673,13 +673,12 @@ const CourseDetail = () => {
                 const totalDurationSeconds = parseDurationToSeconds(module.duration);
                 const watchedSeconds = Math.min(totalDurationSeconds, Math.floor(lastValidTime[module.id] || 0));
                 const remainingSeconds = Math.max(0, totalDurationSeconds - watchedSeconds);
-                
+
                 return (
                   <div
                     key={module.id}
-                    className={`border rounded-lg transition-colors ${
-                      canExpand ? 'hover:bg-muted/50 cursor-pointer' : 'opacity-60'
-                    } ${isExpanded ? 'bg-muted/50 border-primary' : ''} ${isLocked ? 'bg-muted/30' : ''}`}
+                    className={`border rounded-lg transition-colors ${canExpand ? 'hover:bg-muted/50 cursor-pointer' : 'opacity-60'
+                      } ${isExpanded ? 'bg-muted/50 border-primary' : ''} ${isLocked ? 'bg-muted/30' : ''}`}
                   >
                     <div
                       className={`p-4 ${canExpand ? 'cursor-pointer' : 'cursor-not-allowed'}`}
@@ -697,13 +696,12 @@ const CourseDetail = () => {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-4 flex-1">
-                          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                            isCompleted 
-                              ? 'bg-green-500/20 text-green-700 dark:text-green-400' 
-                              : isLocked 
-                                ? 'bg-muted text-muted-foreground' 
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${isCompleted
+                              ? 'bg-green-500/20 text-green-700 dark:text-green-400'
+                              : isLocked
+                                ? 'bg-muted text-muted-foreground'
                                 : 'bg-primary/10 text-primary'
-                          } font-semibold text-sm flex-shrink-0`}>
+                            } font-semibold text-sm flex-shrink-0`}>
                             {isCompleted ? (
                               <CheckCircle2 className="h-5 w-5" />
                             ) : isLocked ? (
@@ -761,7 +759,7 @@ const CourseDetail = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Expanded Video Section */}
                     {isExpanded && hasVideo && canAccess && (
                       <div className="px-4 pb-4 space-y-4">
@@ -775,7 +773,7 @@ const CourseDetail = () => {
                           <div className="aspect-video rounded-lg overflow-hidden bg-black relative">
                             {/* Clickable overlay to start tracking when user clicks to play */}
                             {!isVideoPlaying[module.id] && !isCompleted && (
-                              <div 
+                              <div
                                 className="absolute inset-0 z-10 cursor-pointer flex items-center justify-center bg-black/40 hover:bg-black/30 transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -791,17 +789,27 @@ const CourseDetail = () => {
                                 </div>
                               </div>
                             )}
-                            {/* Google Drive Preview iframe */}
-                            <iframe 
+                            {/* Video embed — supports Google Drive, YouTube, or direct URL */}
+                            <iframe
                               id={`video-iframe-${module.id}`}
-                              src={getGoogleDriveEmbedUrl(module.video_url!)}
+                              src={(() => {
+                                const url = module.video_url!;
+                                // YouTube: https://www.youtube.com/watch?v=ID or /embed/ID
+                                const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+                                if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=${hasStartedVideo[module.id] ? 1 : 0}&rel=0`;
+                                // Google Drive
+                                const driveId = getGoogleDriveFileId(url);
+                                if (driveId) return `https://drive.google.com/file/d/${driveId}/preview`;
+                                // Fallback: use as-is
+                                return url;
+                              })()}
                               className="w-full h-full"
                               allow="autoplay; encrypted-media"
                               title={module.title}
                               allowFullScreen
                             />
                             {/* Overlay to block seek bar (bottom 60px) */}
-                            <div 
+                            <div
                               className="absolute bottom-0 left-0 right-0 h-[60px] bg-gradient-to-t from-black/90 to-black/40 cursor-not-allowed z-20"
                               onClick={(e) => {
                                 e.preventDefault();
@@ -813,7 +821,7 @@ const CourseDetail = () => {
                               }}
                             />
                           </div>
-                          
+
                           {/* Progress Tracker */}
                           {!isCompleted && (
                             <div className="space-y-3">
@@ -834,7 +842,7 @@ const CourseDetail = () => {
                                   </Button>
                                 </div>
                               )}
-                              
+
                               {/* Progress indicator */}
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -844,7 +852,7 @@ const CourseDetail = () => {
                                   </span>
                                 </div>
                                 <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div 
+                                  <div
                                     className="h-full bg-primary transition-all duration-300"
                                     style={{ width: `${videoProgress[module.id] || 0}%` }}
                                   />
@@ -893,7 +901,7 @@ const CourseDetail = () => {
                                   )}
                                 </div>
                               )}
-                              <Button 
+                              <Button
                                 className="w-full bg-orange-500 hover:bg-orange-600"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -936,11 +944,10 @@ const CourseDetail = () => {
             <Card className={`${!(courseProgress >= 100 && hasPassedQuiz) ? 'opacity-80' : ''}`}>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-full ${
-                    courseProgress >= 100 && hasPassedQuiz 
-                      ? 'bg-green-500' 
+                  <div className={`p-3 rounded-full ${courseProgress >= 100 && hasPassedQuiz
+                      ? 'bg-green-500'
                       : 'bg-muted'
-                  }`}>
+                    }`}>
                     {courseProgress >= 100 && hasPassedQuiz ? (
                       <Award className="h-6 w-6 text-white" />
                     ) : (
@@ -950,7 +957,7 @@ const CourseDetail = () => {
                   <div>
                     <CardTitle className="text-xl">Certificate of Completion</CardTitle>
                     <CardDescription>
-                      {courseProgress >= 100 && hasPassedQuiz 
+                      {courseProgress >= 100 && hasPassedQuiz
                         ? "Congratulations! Your certificate is ready to download."
                         : "Complete all modules and pass the final assessment (70%) to unlock your certificate."
                       }
@@ -984,7 +991,7 @@ const CourseDetail = () => {
                           <p className="text-xs text-muted-foreground">{courseProgress}% completed</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                         <div className={`p-1.5 rounded-full ${hasPassedQuiz ? 'bg-green-500' : 'bg-muted-foreground/30'}`}>
                           {hasPassedQuiz ? (
@@ -1001,7 +1008,7 @@ const CourseDetail = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Locked certificate preview */}
                     <div className="relative p-8 border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 text-center">
                       <div className="absolute inset-0 flex items-center justify-center">
