@@ -1,0 +1,4 @@
+- Update src/pages/Auth.tsx: Change supabase import to '../lib/supabaseClient' and replace onAuthStateChange handler with provided code. ✅
+- Move src/components/ResetPassword.tsx to src/pages/ResetPassword.tsx and update its code to match provided minimal code, change import to '../lib/supabaseClient'. ✅
+- Update src/App.tsx: Change import from "./components/ResetPassword" to "./pages/ResetPassword". ✅
+- Verify all changes and test if needed.
