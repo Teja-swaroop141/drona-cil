@@ -16,13 +16,19 @@ const profilesRouter = require('./src/routes/profiles');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// ─── CORS ───────────────────────────────
-// Allow any localhost port (Vite may pick 5173, 8081, etc.)
+// Allow any localhost port or common IP addresses for local development
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin) || origin === process.env.SITE_URL) {
+        // Allow requests with no origin (like mobile apps or curl) 
+        // or any localhost / IP address for local dev
+        if (!origin ||
+            /^http:\/\/localhost(:\d+)?$/.test(origin) ||
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) ||
+            /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/.test(origin) ||
+            origin === process.env.SITE_URL) {
             callback(null, true);
         } else {
+            console.error('CORS blocked origin:', origin);
             callback(new Error(`CORS blocked: ${origin}`));
         }
     },

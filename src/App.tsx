@@ -11,7 +11,7 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import ContactRequest from "./pages/ContactRequest";
 import Admin from "./pages/Admin";
- import Courses from "./pages/Courses";
+import Courses from "./pages/Courses";
 
 const queryClient = new QueryClient();
 
