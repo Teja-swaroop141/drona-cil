@@ -9,12 +9,18 @@ import {
   Loader2,
   Mail,
   ShieldAlert,
+  Users,
+  UserPlus,
+  History,
 } from "lucide-react";
 import { AdminCoursesTab } from "@/components/admin/AdminCoursesTab";
 import { AdminModulesTab } from "@/components/admin/AdminModulesTab";
 import { AdminQuestionsTab } from "@/components/admin/AdminQuestionsTab";
 import { AdminContactsTab } from "@/components/admin/AdminContactsTab";
 import { AdminRoadmapTab } from "@/components/admin/AdminRoadmapTab";
+import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
+import { AdminRolesTab } from "../components/admin/AdminRolesTab";
+import { AdminQuizAttemptsTab } from "@/components/admin/AdminQuizAttemptsTab";
 
 type ViewState =
   | { type: "courses" }
@@ -126,12 +132,24 @@ export default function Admin() {
               <Mail className="h-4 w-4" />
               Contact Requests
             </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="h-4 w-4" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Roles
+            </TabsTrigger>
+            <TabsTrigger value="quiz-attempts" className="gap-2">
+              <History className="h-4 w-4" />
+              Quiz Attempts
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="courses">
             {viewState.type === "courses" && (
-              <AdminCoursesTab 
-                onSelectCourse={handleSelectCourse} 
+              <AdminCoursesTab
+                onSelectCourse={handleSelectCourse}
                 onSelectRoadmap={handleSelectRoadmap}
               />
             )}
@@ -161,6 +179,18 @@ export default function Admin() {
 
           <TabsContent value="contacts">
             <AdminContactsTab />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <AdminUsersTab />
+          </TabsContent>
+
+          <TabsContent value="roles">
+            <AdminRolesTab />
+          </TabsContent>
+
+          <TabsContent value="quiz-attempts">
+            <AdminQuizAttemptsTab />
           </TabsContent>
         </Tabs>
       </main>

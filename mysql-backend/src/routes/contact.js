@@ -2,50 +2,63 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const pool = require('../db');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
 const audienceLabels = {
-    individual: 'Individual',
-    university: 'University/Institution',
-    government: 'Government Department',
+  individual: 'Individual',
+  university: 'University/Institution',
+  government: 'Government Department',
 };
+
+// GET /contact — list all contact requests (admin)
+router.get('/', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM contact_requests ORDER BY created_at DESC'
+    );
+    return res.json({ data: rows, error: null });
+  } catch (err) {
+    return res.status(500).json({ data: null, error: err.message });
+  }
+});
 
 // POST /contact — submit a contact request + send emails
 router.post('/', async (req, res) => {
-    try {
-        const { audience, full_name, email, phone_number, organization, requirement, consent_to_contact } = req.body;
+  try {
+    const { audience, full_name, email, phone_number, organization, requirement, consent_to_contact } = req.body;
 
-        if (!audience || !email || !requirement) {
-            return res.status(400).json({ error: 'Missing required fields: audience, email, requirement' });
-        }
+    if (!audience || !email || !requirement) {
+      return res.status(400).json({ error: 'Missing required fields: audience, email, requirement' });
+    }
 
-        const id = uuidv4();
-        await pool.query(
-            `INSERT INTO contact_requests (id, audience, full_name, email, phone_number, organization, requirement, consent_to_contact)
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO contact_requests (id, audience, full_name, email, phone_number, organization, requirement, consent_to_contact)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, audience, full_name || null, email, phone_number || null, organization || null, requirement, consent_to_contact !== false ? 1 : 0]
-        );
+      [id, audience, full_name || null, email, phone_number || null, organization || null, requirement, consent_to_contact !== false ? 1 : 0]
+    );
 
-        const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
-        const audienceLabel = audienceLabels[audience] || audience;
-        const userName = full_name || 'there';
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+    const audienceLabel = audienceLabels[audience] || audience;
+    const userName = full_name || 'there';
 
-        if (process.env.SMTP_USER && adminEmail) {
-            try {
-                const transporter = nodemailer.createTransport({
-                    host: process.env.SMTP_HOST,
-                    port: parseInt(process.env.SMTP_PORT || '587'),
-                    secure: false,
-                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                });
+    if (process.env.SMTP_USER && adminEmail) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: false,
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        });
 
-                // User confirmation email
-                await transporter.sendMail({
-                    from: `"NTS Language Courses" <${process.env.SMTP_USER}>`,
-                    to: email,
-                    subject: 'We received your request - NTS Language Courses',
-                    html: `
+        // User confirmation email
+        await transporter.sendMail({
+          from: `"NTS Language Courses" <${process.env.SMTP_USER}>`,
+          to: email,
+          subject: 'We received your request - NTS Language Courses',
+          html: `
             <body style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
                 <h1 style="color: white; margin: 0;">Thank You for Reaching Out!</h1>
@@ -64,14 +77,14 @@ router.post('/', async (req, res) => {
               </div>
             </body>
           `,
-                });
+        });
 
-                // Admin notification email
-                await transporter.sendMail({
-                    from: `"NTS Contact System" <${process.env.SMTP_USER}>`,
-                    to: adminEmail,
-                    subject: `New Contact Request: ${audienceLabel} - ${full_name || email}`,
-                    html: `
+        // Admin notification email
+        await transporter.sendMail({
+          from: `"NTS Contact System" <${process.env.SMTP_USER}>`,
+          to: adminEmail,
+          subject: `New Contact Request: ${audienceLabel} - ${full_name || email}`,
+          html: `
             <body style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: linear-gradient(135deg, #dc2626, #f97316); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
                 <h1 style="color: white; margin: 0;">🔔 New Contact Request</h1>
@@ -86,7 +99,7 @@ router.post('/', async (req, res) => {
                   <tr><td style="padding:8px 0;font-weight:bold;">Organization:</td><td>${organization || 'Not provided'}</td></tr>
                 </table>
                 <div style="background:white;padding:20px;border-radius:8px;border-left:4px solid #f97316;margin-top:20px;">
-                  <h3 style="margin-top:0;color:#1e40af;">Requirement</h3>
+                    <h3 style="margin-top:0;color:#1e40af;">Requirement</h3>
                   <p style="white-space:pre-wrap;">${requirement}</p>
                 </div>
                 <p style="text-align:center;margin-top:20px;">
@@ -95,18 +108,30 @@ router.post('/', async (req, res) => {
               </div>
             </body>
           `,
-                });
-            } catch (mailErr) {
-                console.error('Email send error (non-fatal):', mailErr.message);
-            }
-        }
-
-        const [rows] = await pool.query('SELECT * FROM contact_requests WHERE id = ?', [id]);
-        return res.status(201).json({ data: rows[0], error: null });
-    } catch (err) {
-        console.error('Contact request error:', err);
-        return res.status(500).json({ data: null, error: err.message });
+        });
+      } catch (mailErr) {
+        console.error('Email send error (non-fatal):', mailErr.message);
+      }
     }
+
+    const [rows] = await pool.query('SELECT * FROM contact_requests WHERE id = ?', [id]);
+    return res.status(201).json({ data: rows[0], error: null });
+  } catch (err) {
+    console.error('Contact request error:', err);
+    return res.status(500).json({ data: null, error: err.message });
+  }
+});
+
+// PUT /contact/:id — update status (admin)
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    await pool.query('UPDATE contact_requests SET status = ? WHERE id = ?', [status, req.params.id]);
+    const [rows] = await pool.query('SELECT * FROM contact_requests WHERE id = ?', [req.params.id]);
+    return res.json({ data: rows[0], error: null });
+  } catch (err) {
+    return res.status(500).json({ data: null, error: err.message });
+  }
 });
 
 module.exports = router;

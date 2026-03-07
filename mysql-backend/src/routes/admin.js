@@ -6,34 +6,6 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // ─────────────────────────────────────────
-// Contact Requests
-// ─────────────────────────────────────────
-
-// GET /admin/contacts — list all contact requests (admin)
-router.get('/contacts', requireAuth, requireAdmin, async (req, res) => {
-    try {
-        const [rows] = await pool.query(
-            'SELECT * FROM contact_requests ORDER BY created_at DESC'
-        );
-        return res.json({ data: rows, error: null });
-    } catch (err) {
-        return res.status(500).json({ data: null, error: err.message });
-    }
-});
-
-// PUT /admin/contacts/:id — update status
-router.put('/contacts/:id', requireAuth, requireAdmin, async (req, res) => {
-    try {
-        const { status } = req.body;
-        await pool.query('UPDATE contact_requests SET status = ? WHERE id = ?', [status, req.params.id]);
-        const [rows] = await pool.query('SELECT * FROM contact_requests WHERE id = ?', [req.params.id]);
-        return res.json({ data: rows[0], error: null });
-    } catch (err) {
-        return res.status(500).json({ data: null, error: err.message });
-    }
-});
-
-// ─────────────────────────────────────────
 // User Roles
 // ─────────────────────────────────────────
 

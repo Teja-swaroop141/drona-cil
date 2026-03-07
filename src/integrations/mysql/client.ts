@@ -193,6 +193,8 @@ const TABLE_ROUTE_MAP: Record<string, string> = {
   contact_requests:     '/contact',
   profiles:             '/profiles',
   user_roles:           '/admin/roles',
+  admin_users:          '/admin/users',
+  admin_quiz_attempts:  '/admin/quiz-attempts',
 };
 
 class QueryBuilder {
@@ -378,10 +380,27 @@ const storage = {
   },
 };
 
+// ── Functions (edge-function-style calls via Express) ─────────────────────────
+const functions = {
+  async invoke(functionName: string, options?: { body?: unknown }) {
+    try {
+      const res = await apiFetch(`/functions/${functionName}`, {
+        method: 'POST',
+        body: JSON.stringify(options?.body ?? {}),
+      });
+      if (res.error) return { data: null, error: { message: res.error } };
+      return { data: res.data, error: null };
+    } catch (err: unknown) {
+      return { data: null, error: { message: err instanceof Error ? err.message : 'Function invocation failed' } };
+    }
+  },
+};
+
 // ── Main exported client ──────────────────────────────────────────────────────
 export const mysqlClient = {
   auth,
   from: (table: string) => new QueryBuilder(table),
   rpc,
   storage,
+  functions,
 };
