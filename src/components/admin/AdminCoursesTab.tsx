@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +43,16 @@ interface AdminCoursesTabProps {
   onSelectRoadmap: (courseId: string, courseTitle: string) => void;
 }
 
+const API_URL = import.meta.env.VITE_MYSQL_API_URL || "http://localhost:4000";
+const TOKEN_KEY = "mysql_auth_token";
+const getApiHeaders = () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCoursesTabProps) {
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -58,14 +67,11 @@ export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCourse
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setCourses(data || []);
-    } catch (error: any) {
+      const res = await fetch(`${API_URL}/courses`, { headers: getApiHeaders() });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Failed to load courses");
+      setCourses(body.data || []);
+    } catch (error: unknown) {
       console.error("Error fetching courses:", error);
       toast({
         title: "Error",
@@ -90,19 +96,20 @@ export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCourse
     if (!courseToDelete) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("courses")
-        .delete()
-        .eq("id", courseToDelete.id);
-
-      if (error) throw error;
+      const res = await fetch(`${API_URL}/courses/${courseToDelete.id}`, {
+        method: "DELETE",
+        headers: getApiHeaders(),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Failed to delete course");
       toast({ title: "Course deleted successfully" });
       fetchCourses();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to delete course";
       console.error("Error deleting course:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete course",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -154,7 +161,7 @@ export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCourse
         <Card>
           <CardContent className="pt-4">
             <p className="text-2xl font-bold text-primary">
-              {courses.filter((c) => c.level === "Beginner").length}
+              {courses.filter((c) => c.level?.toLowerCase() === "beginner").length}
             </p>
             <p className="text-sm text-muted-foreground">Beginner</p>
           </CardContent>
@@ -162,7 +169,7 @@ export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCourse
         <Card>
           <CardContent className="pt-4">
             <p className="text-2xl font-bold text-orange-600">
-              {courses.filter((c) => c.level === "Intermediate").length}
+              {courses.filter((c) => c.level?.toLowerCase() === "intermediate").length}
             </p>
             <p className="text-sm text-muted-foreground">Intermediate</p>
           </CardContent>
@@ -170,7 +177,7 @@ export function AdminCoursesTab({ onSelectCourse, onSelectRoadmap }: AdminCourse
         <Card>
           <CardContent className="pt-4">
             <p className="text-2xl font-bold text-red-600">
-              {courses.filter((c) => c.level === "Advanced").length}
+              {courses.filter((c) => c.level?.toLowerCase() === "advanced").length}
             </p>
             <p className="text-sm text-muted-foreground">Advanced</p>
           </CardContent>

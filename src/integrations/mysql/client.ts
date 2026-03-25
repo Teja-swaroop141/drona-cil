@@ -213,7 +213,13 @@ class QueryBuilder {
     this.route = TABLE_ROUTE_MAP[table] || `/${table}`;
   }
 
-  select(cols = '*') { this._operation = 'select'; this._selectCols = cols; return this; }
+  select(cols = '*') {
+    // Don't change operation if we're already in insert/update/delete — this
+    // handles chains like .insert(data).select().single() which should still insert.
+    if (this._operation === 'select') this._selectCols = cols;
+    else this._isSingle = false; // just mark we want the returned row
+    return this;
+  }
   insert(body: Record<string, unknown> | Record<string, unknown>[]) { this._operation = 'insert'; this._body = Array.isArray(body) ? body[0] : body; return this; }
   update(body: Record<string, unknown>) { this._operation = 'update'; this._body = body; return this; }
   upsert(body: Record<string, unknown>, _opts?: unknown) { this._operation = 'insert'; this._body = body; return this; }
@@ -370,12 +376,30 @@ async function rpc(
   return { data: null, error: { message: `Unknown RPC function: ${fn}` } };
 }
 
-// ── Storage (stub — no Supabase Storage in MySQL version) ─────────────────────
+// ── Storage (uploads via Express /upload/image endpoint) ──────────────────────
 const storage = {
   from(_bucket: string) {
     return {
-      upload: async (_path: string, _file: File) => ({ data: null, error: { message: 'Storage not available in MySQL mode' } }),
-      getPublicUrl: (_path: string) => ({ data: { publicUrl: '' } }),
+      upload: async (_path: string, file: File): Promise<{ data: { publicUrl: string } | null; error: { message: string } | null }> => {
+        try {
+          const token = getToken();
+          const formData = new FormData();
+          formData.append('file', file);
+          const response = await fetch(`${API_URL}/upload/image`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            return { data: null, error: { message: body.error || response.statusText } };
+          }
+          return { data: { publicUrl: body.data.publicUrl }, error: null };
+        } catch (err: unknown) {
+          return { data: null, error: { message: err instanceof Error ? err.message : 'Upload failed' } };
+        }
+      },
+      getPublicUrl: (path: string) => ({ data: { publicUrl: path } }),
     };
   },
 };

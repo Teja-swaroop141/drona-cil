@@ -1,6 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const { requireAuth, requireAdmin } = require('./src/middleware/auth');
 
 const authRouter = require('./src/routes/auth');
 const coursesRouter = require('./src/routes/courses');
@@ -38,6 +43,44 @@ app.use(cors({
 // ─── Body Parser ─────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ─── Static file serving (uploaded images) ─
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// ─── Multer setup ─────────────────────────
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${uuidv4()}${ext}`);
+    },
+});
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed'));
+    },
+});
+
+// ─── Image Upload Route (for course images) ─
+app.post('/upload/image', requireAuth, requireAdmin, (req, res) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'File too large. Maximum size is 10 MB.' });
+            }
+            return res.status(400).json({ error: err.message || 'Upload failed' });
+        }
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const API_URL = process.env.API_URL || `http://localhost:${process.env.PORT || 4000}`;
+        const publicUrl = `${API_URL}/uploads/${req.file.filename}`;
+        return res.json({ data: { publicUrl }, error: null });
+    });
+});
 
 // ─── Health Check ────────────────────────
 app.get('/health', (req, res) => {
