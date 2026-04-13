@@ -70,6 +70,29 @@ router.post('/', requireAuth, async (req, res) => {
     }
 });
 
+// PUT /enrollments/by-course/:courseId — update enrollment by user_id+course_id (used by CourseDetail)
+router.put('/by-course/:courseId', requireAuth, async (req, res) => {
+    try {
+        const { progress, completed } = req.body;
+        const updates = []; const values = [];
+        if (progress !== undefined) { updates.push('progress = ?'); values.push(progress); }
+        if (completed !== undefined) { updates.push('completed = ?'); values.push(completed ? 1 : 0); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+        values.push(req.user.id, req.params.courseId);
+        await pool.query(
+            `UPDATE user_enrollments SET ${updates.join(', ')} WHERE user_id = ? AND course_id = ?`,
+            values
+        );
+        const [rows] = await pool.query(
+            'SELECT * FROM user_enrollments WHERE user_id = ? AND course_id = ?',
+            [req.user.id, req.params.courseId]
+        );
+        return res.json({ data: rows[0] || null, error: null });
+    } catch (err) {
+        return res.status(500).json({ data: null, error: err.message });
+    }
+});
+
 // PUT /enrollments/:id — update progress/completed
 router.put('/:id', requireAuth, async (req, res) => {
     try {

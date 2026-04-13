@@ -41,43 +41,73 @@ app.use(cors({
 }));
 
 // ─── Body Parser ─────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50gb' }));
+app.use(express.urlencoded({ limit: '50gb', extended: true }));
 
 // ─── Static file serving (uploaded images) ─
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const IMAGES_DIR = path.join(UPLOADS_DIR, 'images');
+const VIDEOS_DIR = path.join(UPLOADS_DIR, 'videos');
+if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// ─── Multer setup ─────────────────────────
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-    filename: (_req, file, cb) => {
+// ─── Multer setup (images) ────────────────
+const imageStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, IMAGES_DIR),
+    filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        cb(null, `${uuidv4()}${ext}`);
+        const prefix = req.body.courseName ? req.body.courseName.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'image';
+        cb(null, `${prefix}_${uuidv4().substring(0, 8)}${ext}`);
     },
 });
-const upload = multer({
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+const uploadImage = multer({
+    storage: imageStorage,
     fileFilter: (_req, file, cb) => {
         if (file.mimetype.startsWith('image/')) cb(null, true);
         else cb(new Error('Only image files are allowed'));
     },
 });
 
+// ─── Multer setup (videos) ────────────────
+const videoStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, VIDEOS_DIR),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const prefix = req.body.courseName ? req.body.courseName.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'video';
+        cb(null, `${prefix}_${uuidv4().substring(0, 8)}${ext}`);
+    },
+});
+const uploadVideo = multer({
+    storage: videoStorage,
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith('video/')) cb(null, true);
+        else cb(new Error('Only video files are allowed'));
+    },
+});
+
 // ─── Image Upload Route (for course images) ─
 app.post('/upload/image', requireAuth, requireAdmin, (req, res) => {
-    upload.single('file')(req, res, (err) => {
+    uploadImage.single('file')(req, res, (err) => {
         if (err) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(413).json({ error: 'File too large. Maximum size is 10 MB.' });
-            }
             return res.status(400).json({ error: err.message || 'Upload failed' });
         }
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const API_URL = process.env.API_URL || `http://localhost:${process.env.PORT || 4000}`;
-        const publicUrl = `${API_URL}/uploads/${req.file.filename}`;
+        const publicUrl = `${API_URL}/uploads/images/${req.file.filename}`;
+        return res.json({ data: { publicUrl }, error: null });
+    });
+});
+
+// ─── Video Upload Route (for module videos) ─
+app.post('/upload/video', requireAuth, requireAdmin, (req, res) => {
+    uploadVideo.single('file')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ error: err.message || 'Upload failed' });
+        }
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const API_URL = process.env.API_URL || `http://localhost:${process.env.PORT || 4000}`;
+        const publicUrl = `${API_URL}/uploads/videos/${req.file.filename}`;
         return res.json({ data: { publicUrl }, error: null });
     });
 });

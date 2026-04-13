@@ -70,16 +70,39 @@ router.post('/grade', requireAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// GET /quiz/attempts?module_id=X — get user's quiz attempts for a module
+// GET /quiz/attempts?module_id=X or ?module_id:in=X,Y — user's attempts
 // ─────────────────────────────────────────
 router.get('/attempts', requireAuth, async (req, res) => {
     try {
-        const { module_id } = req.query;
         const userId = req.user.id;
         let query = 'SELECT * FROM quiz_attempts WHERE user_id = ?';
         const params = [userId];
-        if (module_id) { query += ' AND module_id = ?'; params.push(module_id); }
+
+        // Single module_id filter
+        if (req.query['module_id']) {
+            query += ' AND module_id = ?';
+            params.push(req.query['module_id']);
+        }
+        // module_id:in filter (comma-separated list from mysql client)
+        const moduleIn = req.query['module_id:in'];
+        if (moduleIn) {
+            const ids = String(moduleIn).split(',').filter(Boolean);
+            if (ids.length > 0) {
+                query += ` AND module_id IN (${ids.map(() => '?').join(',')})`;
+                params.push(...ids);
+            }
+        }
+        // passed filter
+        if (req.query['passed'] !== undefined) {
+            query += ' AND passed = ?';
+            params.push(req.query['passed'] === 'true' || req.query['passed'] === '1' ? 1 : 0);
+        }
+
         query += ' ORDER BY created_at DESC';
+
+        const limit = parseInt(req.query['_limit'] || '0', 10);
+        if (limit > 0) query += ` LIMIT ${limit}`;
+
         const [rows] = await pool.query(query, params);
         return res.json({ data: rows, error: null });
     } catch (err) {
