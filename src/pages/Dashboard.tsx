@@ -24,7 +24,7 @@ interface Course {
   isEnrolled?: boolean;
 }
 
-const Dashboard = () => {
+const   Dashboard = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);

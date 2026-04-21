@@ -228,6 +228,7 @@ class QueryBuilder {
   eq(col: string, val: unknown)  { this._filters.push({ col, val }); return this; }
   neq(col: string, val: unknown) { this._filters.push({ col: `${col}:neq`, val }); return this; }
   in(col: string, vals: unknown[]) { this._filters.push({ col: `${col}:in`, val: vals.join(',') }); return this; }
+  not(col: string, _op: string, _val: unknown) { this._filters.push({ col: `${col}:not-null`, val: '1' }); return this; }
 
   order(col: string, opts?: { ascending?: boolean }) {
     this._order = { col, ascending: opts?.ascending !== false };
@@ -293,6 +294,18 @@ class QueryBuilder {
           }
         }
 
+        // ── Special case: module progress for a course (certificate fetch)
+        if (this.table === 'user_module_progress') {
+          const courseId = this.findFilter('course_id');
+          if (!courseId) {
+            // Check for course_id via join (module_id:in filter from certificate)
+            const moduleInFilter = this._filters.find(f => f.col === 'module_id:in');
+            if (moduleInFilter) {
+              // Fall through to general query with module_id:in filter
+            }
+          }
+        }
+
         // ── Single by id
         if (id && this._isSingle) {
           const res = await apiFetch(`${this.route}/${id}`);
@@ -323,16 +336,11 @@ class QueryBuilder {
         if (this.table === 'user_enrollments' && !id) {
           const courseId = this.findFilter('course_id');
           if (courseId) {
-            // GET the enrollment id first, then PATCH it
-            const checkRes = await apiFetch(`/enrollments/${courseId}/check`);
-            if (checkRes.data && (checkRes.data as { id: string }).id) {
-              const enrollmentId = (checkRes.data as { id: string }).id;
-              const res = await apiFetch(`/enrollments/${enrollmentId}`, {
-                method: 'PUT',
-                body: JSON.stringify(this._body),
-              });
-              return { data: res.data, error: res.error ? { message: res.error } : null };
-            }
+            const res = await apiFetch(`/enrollments/by-course/${courseId}`, {
+              method: 'PUT',
+              body: JSON.stringify(this._body),
+            });
+            return { data: res.data, error: res.error ? { message: res.error } : null };
           }
           return { data: null, error: null };
         }
@@ -408,7 +416,12 @@ const storage = {
 const functions = {
   async invoke(functionName: string, options?: { body?: unknown }) {
     try {
-      const res = await apiFetch(`/functions/${functionName}`, {
+      // Map Supabase Edge Function names → Express routes
+      const routeMap: Record<string, string> = {
+        'grade-quiz': '/quiz/grade',
+      };
+      const route = routeMap[functionName] || `/functions/${functionName}`;
+      const res = await apiFetch(route, {
         method: 'POST',
         body: JSON.stringify(options?.body ?? {}),
       });

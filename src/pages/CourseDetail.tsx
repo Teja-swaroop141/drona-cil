@@ -442,6 +442,10 @@ const CourseDetail = () => {
     // Use full video duration for completion
     const requiredWatchTime = totalDuration;
 
+    // Prevent fighting with native video tracking
+    const isNativeVideo = selectedModule.video_url.endsWith(".mp4") || selectedModule.video_url.endsWith(".webm") || selectedModule.video_url.endsWith(".ogg") || selectedModule.video_url.includes("/uploads/videos/");
+    if (isNativeVideo) return;
+
     const interval = setInterval(() => {
       const startTime = videoStartTime[moduleId];
       if (!startTime) return;
@@ -789,45 +793,63 @@ const CourseDetail = () => {
                                 </div>
                               </div>
                             )}
-                            {/* Video embed — supports Google Drive, YouTube, or direct URL */}
-                            <iframe
-                              id={`video-iframe-${module.id}`}
-                              src={(() => {
-                                const url = module.video_url!;
-                                // YouTube: https://www.youtube.com/watch?v=ID or /embed/ID
-                                const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-                                if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=${hasStartedVideo[module.id] ? 1 : 0}&rel=0`;
-                                // Google Drive
-                                const driveId = getGoogleDriveFileId(url);
-                                if (driveId) return `https://drive.google.com/file/d/${driveId}/preview`;
-                                // Fallback: use as-is
-                                return url;
-                              })()}
-                              className="w-full h-full"
-                              allow="autoplay; encrypted-media"
-                              title={module.title}
-                              allowFullScreen
-                            />
-                            {/* Overlay to block seek bar (bottom 60px) */}
-                            <div
-                              className="absolute bottom-0 left-0 right-0 h-[60px] bg-gradient-to-t from-black/90 to-black/40 cursor-not-allowed z-20"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                toast.error("Seeking is disabled to maintain learning integrity.", {
-                                  id: "seek-blocked",
-                                  duration: 2000
-                                });
-                              }}
-                            />
+                            {(() => {
+                              const url = module.video_url!;
+                              
+                              // Check if it's a native video file (uploaded or standard URL)
+                              const isNativeVideo = url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg") || url.includes("/uploads/videos/");
+                              
+                              if (isNativeVideo) {
+                                return (
+                                  <video
+                                    id={`video-${module.id}`}
+                                    src={url}
+                                    controls
+                                    controlsList="nodownload"
+                                    className="w-full h-full object-contain"
+                                    onPlay={() => {
+                                      if (!hasStartedVideo[module.id]) toggleVideoPlayback(module.id);
+                                    }}
+                                    onTimeUpdate={(e) => {
+                                      const vid = e.currentTarget;
+                                      if (!vid.duration) return;
+                                      const progressPercent = (vid.currentTime / vid.duration) * 100;
+                                      setVideoProgress(prev => ({ ...prev, [module.id]: Math.min(100, progressPercent) }));
+                                      setLastValidTime(prev => ({ ...prev, [module.id]: vid.currentTime }));
+                                    }}
+                                    onEnded={() => {
+                                      if (!isCompleted) markModuleComplete(module.id);
+                                    }}
+                                  />
+                                );
+                              }
+                              
+                              // external URLs logic (YouTube/Drive fallback)
+                              const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+                              const driveId = getGoogleDriveFileId(url);
+                              let embedUrl = url;
+                              if (ytMatch) embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=${hasStartedVideo[module.id] ? 1 : 0}&rel=0`;
+                              else if (driveId) embedUrl = `https://drive.google.com/file/d/${driveId}/preview`;
+                              
+                              return (
+                                <iframe
+                                  id={`video-iframe-${module.id}`}
+                                  src={embedUrl}
+                                  className="w-full h-full"
+                                  allow="autoplay; encrypted-media"
+                                  title={module.title}
+                                  allowFullScreen
+                                />
+                              );
+                            })()}
                           </div>
 
                           {/* Progress Tracker */}
                           {!isCompleted && (
                             <div className="space-y-3">
-                              {/* Pause button - only shown when playing */}
-                              {isVideoPlaying[module.id] && (
-                                <div className="flex justify-center">
+                              {/* Action Buttons */}
+                              <div className="flex justify-center gap-4 flex-wrap">
+                                {(module.video_url?.match(/(?:youtube\.com|youtu\.be|drive\.google\.com)/) && isVideoPlaying[module.id]) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -838,10 +860,22 @@ const CourseDetail = () => {
                                     className="text-amber-600 border-amber-300 hover:bg-amber-50"
                                   >
                                     <Pause className="h-4 w-4 mr-2" />
-                                    Pause Tracking
+                                    Pause Timer
                                   </Button>
-                                </div>
-                              )}
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markModuleComplete(module.id);
+                                  }}
+                                  className="text-primary hover:bg-primary/20"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Mark as Complete (Skip)
+                                </Button>
+                              </div>
 
                               {/* Progress indicator */}
                               <div className="space-y-1">
@@ -857,7 +891,7 @@ const CourseDetail = () => {
                                     style={{ width: `${videoProgress[module.id] || 0}%` }}
                                   />
                                 </div>
-                                {isVideoPlaying[module.id] && (
+                                {(isVideoPlaying[module.id] && remainingSeconds > 0) && (
                                   <p className="text-xs text-green-600 dark:text-green-400 text-center animate-pulse">
                                     ⏱ Tracking... {formatSeconds(remainingSeconds)} remaining
                                   </p>

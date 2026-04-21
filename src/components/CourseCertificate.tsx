@@ -2,9 +2,27 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Download, Award, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import ntsLogo from "@/assets/nts-logo.jpeg";
 import ashokaEmblem from "@/assets/ashoka-emblem.jpeg";
+
+const API_URL = import.meta.env.VITE_MYSQL_API_URL || "http://localhost:4000";
+const TOKEN_KEY = "mysql_auth_token";
+const USER_KEY = "mysql_auth_user";
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function getStoredUser(): { id: string; email: string; user_metadata?: Record<string, string> } | null {
+  try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch { return null; }
+}
+async function apiFetch(path: string) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const body = await res.json();
+  return { ok: res.ok, data: body.data ?? body, error: body.error ?? null };
+}
 
 interface CourseCertificateProps {
   courseId: string;
@@ -38,64 +56,61 @@ const CourseCertificate = ({
 
   const fetchCertificateData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getStoredUser();
       if (!user) return;
 
-      // Fetch user profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, name")
-        .eq("id", user.id)
-        .single();
+      // Fetch profile
+      const profileRes = await apiFetch(`/profiles/${user.id}`);
+      const profile = profileRes.data as { first_name?: string; last_name?: string; name?: string } | null;
 
-      // Fetch enrollment details
-      const { data: enrollment } = await supabase
-        .from("user_enrollments")
-        .select("enrolled_at")
-        .eq("user_id", user.id)
-        .eq("course_id", courseId)
-        .single();
+      // Fetch enrollment (to get enrolled_at)
+      const enrollRes = await apiFetch(`/enrollments/${courseId}/check`);
+      const enrollment = enrollRes.data as { enrolled_at?: string } | null;
 
-      // Fetch course modules for this course
-      const { data: modules } = await supabase
-        .from("course_modules")
-        .select("id")
-        .eq("course_id", courseId);
+      // Fetch modules for this course (to get module IDs)
+      const modulesRes = await apiFetch(`/modules?course_id=${courseId}`);
+      const modules = (Array.isArray(modulesRes.data) ? modulesRes.data : []) as { id: string }[];
+      const moduleIds = modules.map((m) => m.id);
 
-      const moduleIds = modules?.map(m => m.id) || [];
-
-      // Fetch latest quiz attempt for the final assessment
-      const { data: quizAttempts } = await supabase
-        .from("quiz_attempts")
-        .select("score, total_questions, created_at, passed")
-        .eq("user_id", user.id)
-        .in("module_id", moduleIds)
-        .eq("passed", true)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Fetch quiz attempts (passed ones) for these modules
+      let quizAttempt: { score?: number; total_questions?: number; created_at?: string } | null = null;
+      if (moduleIds.length > 0) {
+        const attemptsRes = await apiFetch(`/quiz/attempts`);
+        const allAttempts = (Array.isArray(attemptsRes.data) ? attemptsRes.data : []) as {
+          module_id: string; score: number; total_questions: number; passed: boolean; created_at: string;
+        }[];
+        const passed = allAttempts
+          .filter((a) => moduleIds.includes(a.module_id) && a.passed)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        quizAttempt = passed[0] ?? null;
+      }
 
       // Fetch latest module completion date
-      const { data: moduleProgress } = await supabase
-        .from("user_module_progress")
-        .select("completed_at")
-        .eq("user_id", user.id)
-        .in("module_id", moduleIds)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(1);
+      const progressRes = await apiFetch(`/progress?course_id=${courseId}`);
+      const progressData = (Array.isArray(progressRes.data) ? progressRes.data : []) as {
+        completed: boolean; completed_at?: string;
+      }[];
+      const latestCompleted = progressData
+        .filter((p) => p.completed && p.completed_at)
+        .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime());
 
-      const userName = profile?.first_name && profile?.last_name 
-        ? `${profile.first_name} ${profile.last_name}`
-        : profile?.name || "Student";
-
-      const quizAttempt = quizAttempts?.[0];
+      const userName =
+        profile?.first_name && profile?.last_name
+          ? `${profile.first_name} ${profile.last_name}`
+          : profile?.name ||
+            user.user_metadata?.name ||
+            user.email?.split("@")[0] ||
+            "Student";
 
       setCertificateData({
         userName,
         enrolledAt: enrollment?.enrolled_at || new Date().toISOString(),
-        completedAt: moduleProgress?.[0]?.completed_at || quizAttempt?.created_at || new Date().toISOString(),
-        quizScore: quizAttempt?.score || 0,
-        totalQuestions: quizAttempt?.total_questions || 10,
+        completedAt:
+          latestCompleted[0]?.completed_at ||
+          quizAttempt?.created_at ||
+          new Date().toISOString(),
+        quizScore: (quizAttempt as { score?: number })?.score ?? 0,
+        totalQuestions: (quizAttempt as { total_questions?: number })?.total_questions ?? 10,
       });
     } catch (error) {
       console.error("Error fetching certificate data:", error);

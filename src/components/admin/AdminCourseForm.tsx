@@ -121,15 +121,6 @@ export function AdminCourseForm({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please choose an image under 10 MB.",
-          variant: "destructive",
-        });
-        e.target.value = "";
-        return;
-      }
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
       form.setValue("image_url", ""); // clear URL field when a file is chosen
@@ -141,6 +132,7 @@ export function AdminCourseForm({
     try {
       const token = getToken();
       const formData = new FormData();
+      formData.append("courseName", form.getValues("title"));
       formData.append("file", file);
       const response = await fetch(`${API_URL}/upload/image`, {
         method: "POST",
@@ -326,7 +318,7 @@ export function AdminCourseForm({
                 <label className="cursor-pointer inline-block">
                   <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted text-sm">
                     <Upload className="h-4 w-4" />
-                    {imageFile ? imageFile.name : "Choose image (max 10 MB)"}
+                    {imageFile ? imageFile.name : "Choose image"}
                   </div>
                   <input
                     type="file"
